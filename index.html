@@ -714,19 +714,74 @@ function submitClientRegister(){
   openSubscriptionModal("client");
 }
 function submitArtisanRegister(){
-  const name=document.getElementById("ra_name").value.trim();
-  const email=document.getElementById("ra_email").value.trim().toLowerCase();
-  const country=document.getElementById("ra_country").value;
-  const phone=document.getElementById("ra_phone").value.trim();
-  const pass=document.getElementById("ra_pass").value;
-  if(!name||!email||!phone||!pass){ toast("Merci de remplir tous les champs.","err"); return; }
-  if(DB.users.some(u=>u.email.toLowerCase()===email)){ toast("Cet email est déjà utilisé.","err"); return; }
-  const user = {id:uid("art"), role:"artisan", name, email, password:pass, phone, countryCode:country,
-    gps:null, trades:[], minPrice:null, available:false, verified:false, rating:0, ratingsCount:0,
-    subscription:{plan:null,status:"pending",end:null}, wallet:{balance:0}, createdAt:Date.now()};
-  DB.users.push(user); saveDB(DB);
-  SESSION={id:user.id}; persistSession();
-  go("/artisan?onboarding=1");
+ 
+async function submitClientRegister(){
+  const name = document.getElementById("rc_name").value.trim();
+  const email = document.getElementById("rc_email").value.trim().toLowerCase();
+  const country = document.getElementById("rc_country").value;
+  const phone = document.getElementById("rc_phone").value.trim();
+  const pass = document.getElementById("rc_pass").value;
+
+  if(!name || !email || !phone || !pass){
+    toast("Merci de remplir tous les champs.", "err");
+    return;
+  }
+
+  if(pass.length < 6){
+    toast("Le mot de passe doit contenir au moins 6 caractères.", "err");
+    return;
+  }
+
+  if(!window.supabase){
+    toast("Le service Supabase n'est pas disponible.", "err");
+    return;
+  }
+
+  try {
+    const { data, error } = await window.supabase.auth.signUp({
+      email: email,
+      password: pass,
+      options: {
+        data: {
+          role: "client",
+          full_name: name,
+          phone: country + phone
+        }
+      }
+    });
+
+    if(error){
+      toast(error.message, "err");
+      return;
+    }
+
+    if(data.user && !data.session){
+      document.getElementById("authBody").innerHTML = `
+        <div style="text-align:center; padding:25px 10px;">
+          <h2>Vérifiez votre adresse e-mail</h2>
+          <p>Votre compte a été créé avec succès.</p>
+          <p>Nous vous avons envoyé un e-mail de confirmation.</p>
+          <p>Ouvrez cet e-mail et cliquez sur le lien pour activer votre compte.</p>
+          <button class="btn btn-primary btn-block"
+            onclick="go('/login')">
+            Aller à la connexion
+          </button>
+        </div>
+      `;
+      return;
+    }
+
+    toast("Compte créé avec succès !", "ok");
+    SESSION = {id: data.user.id};
+    persistSession();
+    openSubscriptionModal("client");
+
+  } catch(error) {
+    toast("Une erreur est survenue lors de l'inscription.", "err");
+    console.error(error);
+  }
+}
+
 }
 
 /* =========================================================================================
